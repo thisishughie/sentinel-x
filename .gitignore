@@ -1,0 +1,5 @@
+node_modules/
+.env
+governance_archive.json
+package-lock.json
+*.log
