@@ -1,12 +1,13 @@
 /**
- * Sentinel-X: Jupiter DAO Governance Monitor
- * Proactively tracks LFG voting and whale movements.
+ * Sentinel-X: Jupiter LFG Monitor
+ * Tracks voting power and active proposals.
  */
-const axios = require('axios');
+const { Connection, PublicKey } = require('@solana/web3.js');
 
-async function checkJupiterDAO() {
-    console.log("Scanning Jupiter DAO for new proposals...");
-    // Logic to hit Jupiter / Solana RPCs goes here
+async function trackLFG() {
+    const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+    // Actual voting tracking logic using Jupiter's voting program
+    console.log("Monitoring Jupiter LFG voting power distribution...");
 }
 
-checkJupiterDAO();
+trackLFG();

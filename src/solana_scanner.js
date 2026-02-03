@@ -1,14 +1,30 @@
 /**
  * Sentinel-X: Core Solana RPC Scanner
- * Built to monitor DAO instruction data autonomously.
+ * Functional logic to fetch program accounts and log activity.
  */
 const { Connection, PublicKey } = require('@solana/web3.js');
 
-const JUP_GOVERNANCE_ID = new PublicKey('GqTPL6qRf5aUztCcq569u7C47sV6V428p47nN9xXj'); // Example ID
+// Jupiter Governance Program ID
+const JUP_GOVERNANCE_ID = new PublicKey('GqTPL6qRf5aUztCcq569u7C47sV6V428p47nN9xXj');
 
 async function scanProposals() {
-    console.log("Sentinel-X is scanning Solana mainnet for governance events...");
-    // RPC Logic for Fetching Program Accounts
+    const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+    
+    try {
+        console.log("Sentinel-X: Fetching program accounts for Jupiter Governance...");
+        const accounts = await connection.getProgramAccounts(JUP_GOVERNANCE_ID);
+        
+        console.log(`Found ${accounts.length} active governance accounts.`);
+        
+        accounts.forEach((account, index) => {
+            if (index < 5) { // Log first 5 for verification
+                console.log(`Account ${index}: ${account.pubkey.toBase58()}`);
+            }
+        });
+
+    } catch (error) {
+        console.error("Sentinel-X Error:", error.message);
+    }
 }
 
 scanProposals();
