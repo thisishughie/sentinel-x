@@ -5,32 +5,42 @@
 const { Connection, PublicKey } = require('@solana/web3.js');
 const ProposalAnalyzer = require('./proposal_analyzer');
 const Archiver = require('./archiver');
+const InstructionDecoder = require('./instruction_decoder');
+const Notifier = require('./notifier');
 
 const analyzer = new ProposalAnalyzer();
 const archiver = new Archiver();
+const decoder = new InstructionDecoder();
+const notifier = new Notifier();
 
 async function runOracle() {
     console.log("Sentinel-X: Oracle sequence initialized.");
     
-    // 1. Fetch Latest Proposals (Simulated for this block)
-    const mockProposals = [
-        { id: 'JUP-101', title: 'Treasury Diversification', description: 'Move 1M USDC to Helius RPC funding.', isControversial: false },
-        { id: 'JUP-102', title: 'LFG Token Mint', description: 'Enable minting for new launchpad project.', isControversial: true }
+    // Simulated input from RPC
+    const mockEvents = [
+        { 
+            proposal: { id: 'JUP-201', title: 'Whale Liquidity Migration', description: 'Moving 500k SOL to new vault.' },
+            data: Buffer.from([2, 0, 0, 0]) // Simulated ExecuteProposal instruction
+        }
     ];
 
-    for (const proposal of mockProposals) {
+    for (const event of mockEvents) {
+        // 1. Decode
+        const decoded = decoder.decode(event.data);
+
         // 2. Analyze
-        const report = analyzer.analyze(proposal);
-        console.log(`Analysis for ${proposal.id}: `, report);
+        const report = analyzer.analyze(event.proposal);
 
         // 3. Archive
-        await archiver.archive({
-            ...proposal,
-            analysis: report
-        });
+        await archiver.archive({ ...event.proposal, analysis: report, action: decoded.action });
+
+        // 4. Notify if High/Critical
+        if (['HIGH', 'CRITICAL'].includes(report.impact)) {
+            await notifier.sendAlert(report, decoded.action);
+        }
     }
 
-    console.log("Sentinel-X: Cycle complete. Entering watch mode...");
+    console.log("Sentinel-X: Cycle complete.");
 }
 
 runOracle().catch(err => console.error(err));
