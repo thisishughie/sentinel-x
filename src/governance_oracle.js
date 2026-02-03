@@ -13,7 +13,6 @@ const archiver = new Archiver();
 const notifier = new Notifier();
 const plugins = new PluginManager();
 
-// Register Initial Plugins
 plugins.register('Jupiter Governance', 'GqTPL6qRf5aUztCcq569u7C47sV6V428p47nN9xXj');
 plugins.register('Realms Governance', 'GovER5Lth9YzCRnS1M24LnaTvBnxA9vS53oU4X8hN1f');
 
@@ -22,6 +21,7 @@ async function watchDAO(name, programId) {
     const signatures = await rpc.getLatestSignatures(new PublicKey(programId), 3);
     
     for (const sig of signatures) {
+        console.log(`Sentinel-X: [${name}] Processing ${sig}`);
         const tx = await rpc.getTransactionData(sig);
         if (!tx) continue;
 
@@ -29,7 +29,7 @@ async function watchDAO(name, programId) {
         if (!instructionData) continue;
 
         const decoded = decoder.decode(Buffer.from(instructionData, 'base64'));
-        const report = analyzer.analyze({ title: `[${name}] ${sig.slice(0, 8)}`, description: 'Governance event.' });
+        const report = analyzer.analyze({ title: `[${name}] ${sig.slice(0, 8)}`, description: 'Governance event detected.' });
 
         await archiver.archive({ dao: name, id: sig, analysis: report, action: decoded.action });
 
@@ -40,10 +40,12 @@ async function watchDAO(name, programId) {
 }
 
 async function cycle() {
+    console.log("--- Starting Watch Cycle ---");
     for (const [id, plugin] of plugins.plugins) {
-        await watchDAO(plugin.name, id).catch(err => console.error(err));
+        await watchDAO(plugin.name, id).catch(err => console.error("Cycle Error:", err.message));
     }
+    console.log("--- Cycle Complete ---");
 }
 
-setInterval(cycle, 600000); // Cycle every 10 mins
+setInterval(cycle, 600000);
 cycle();

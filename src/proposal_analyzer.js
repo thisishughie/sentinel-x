@@ -13,7 +13,7 @@ class ProposalAnalyzer {
      * @param {Object} proposalData 
      */
     analyze(proposalData) {
-        console.log("Sentinel-X: Analyzing proposal sentiment...");
+        console.log("Sentinel-X: Analyzing: ...");
         
         // Mocking the heuristic brain for now - this will eventually hit an internal LLM endpoint
         const keywordImpact = {
