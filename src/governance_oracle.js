@@ -1,47 +1,37 @@
-/**
- * Sentinel-X: Main Governance Oracle
- * End-to-end autonomous flow: Polling -> Decoding -> Analysis -> Archiving -> Notification
- */
 const { PublicKey } = require('@solana/web3.js');
 const RPCEngine = require('./rpc_engine');
 const InstructionDecoder = require('./instruction_decoder');
 const ProposalAnalyzer = require('./proposal_analyzer');
 const Archiver = require('./archiver');
 const Notifier = require('./notifier');
-
-const JUP_GOVERNANCE_ID = new PublicKey('GqTPL6qRf5aUztCcq569u7C47sV6V428p47nN9xXj');
+const PluginManager = require('./plugin_manager');
 
 const rpc = new RPCEngine();
 const decoder = new InstructionDecoder();
 const analyzer = new ProposalAnalyzer();
 const archiver = new Archiver();
 const notifier = new Notifier();
+const plugins = new PluginManager();
 
-async function startWatching() {
-    console.log("Sentinel-X: Eternal Watch Mode Initiated.");
-    
-    // Poll for the last 5 signatures
-    const signatures = await rpc.getLatestSignatures(JUP_GOVERNANCE_ID, 5);
+// Register Initial Plugins
+plugins.register('Jupiter Governance', 'GqTPL6qRf5aUztCcq569u7C47sV6V428p47nN9xXj');
+plugins.register('Realms Governance', 'GovER5Lth9YzCRnS1M24LnaTvBnxA9vS53oU4X8hN1f');
+
+async function watchDAO(name, programId) {
+    console.log(`Sentinel-X: Watching ${name}...`);
+    const signatures = await rpc.getLatestSignatures(new PublicKey(programId), 3);
     
     for (const sig of signatures) {
-        console.log(`Sentinel-X: Processing Signature: ${sig}`);
-        
         const tx = await rpc.getTransactionData(sig);
         if (!tx) continue;
 
-        // Extract instruction data (simplified for POC)
         const instructionData = tx.transaction.message.instructions[0]?.data;
         if (!instructionData) continue;
 
-        const bufferData = Buffer.from(instructionData, 'base64');
-        const decoded = decoder.decode(bufferData);
-        
-        // Analyze Metadata (Placeholder metadata for now)
-        const metadata = { title: `TX: ${sig.slice(0, 8)}`, description: 'Instruction data captured from chain.' };
-        const report = analyzer.analyze(metadata);
+        const decoded = decoder.decode(Buffer.from(instructionData, 'base64'));
+        const report = analyzer.analyze({ title: `[${name}] ${sig.slice(0, 8)}`, description: 'Governance event.' });
 
-        // Archive & Notify
-        await archiver.archive({ id: sig, analysis: report, action: decoded.action });
+        await archiver.archive({ dao: name, id: sig, analysis: report, action: decoded.action });
 
         if (['HIGH', 'CRITICAL'].includes(report.impact)) {
             await notifier.sendAlert(report, decoded.action);
@@ -49,9 +39,11 @@ async function startWatching() {
     }
 }
 
-// Run the sequence every 5 minutes (300000ms)
-setInterval(() => {
-    startWatching().catch(err => console.error(err));
-}, 300000);
+async function cycle() {
+    for (const [id, plugin] of plugins.plugins) {
+        await watchDAO(plugin.name, id).catch(err => console.error(err));
+    }
+}
 
-startWatching().catch(err => console.error(err));
+setInterval(cycle, 600000); // Cycle every 10 mins
+cycle();
