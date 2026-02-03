@@ -1,46 +1,57 @@
 /**
  * Sentinel-X: Main Governance Oracle
- * The brain that orchestrates monitoring, analysis, and archiving.
+ * End-to-end autonomous flow: Polling -> Decoding -> Analysis -> Archiving -> Notification
  */
-const { Connection, PublicKey } = require('@solana/web3.js');
+const { PublicKey } = require('@solana/web3.js');
+const RPCEngine = require('./rpc_engine');
+const InstructionDecoder = require('./instruction_decoder');
 const ProposalAnalyzer = require('./proposal_analyzer');
 const Archiver = require('./archiver');
-const InstructionDecoder = require('./instruction_decoder');
 const Notifier = require('./notifier');
 
+const JUP_GOVERNANCE_ID = new PublicKey('GqTPL6qRf5aUztCcq569u7C47sV6V428p47nN9xXj');
+
+const rpc = new RPCEngine();
+const decoder = new InstructionDecoder();
 const analyzer = new ProposalAnalyzer();
 const archiver = new Archiver();
-const decoder = new InstructionDecoder();
 const notifier = new Notifier();
 
-async function runOracle() {
-    console.log("Sentinel-X: Oracle sequence initialized.");
+async function startWatching() {
+    console.log("Sentinel-X: Eternal Watch Mode Initiated.");
     
-    // Simulated input from RPC
-    const mockEvents = [
-        { 
-            proposal: { id: 'JUP-201', title: 'Whale Liquidity Migration', description: 'Moving 500k SOL to new vault.' },
-            data: Buffer.from([2, 0, 0, 0]) // Simulated ExecuteProposal instruction
-        }
-    ];
+    // Poll for the last 5 signatures
+    const signatures = await rpc.getLatestSignatures(JUP_GOVERNANCE_ID, 5);
+    
+    for (const sig of signatures) {
+        console.log(`Sentinel-X: Processing Signature: ${sig}`);
+        
+        const tx = await rpc.getTransactionData(sig);
+        if (!tx) continue;
 
-    for (const event of mockEvents) {
-        // 1. Decode
-        const decoded = decoder.decode(event.data);
+        // Extract instruction data (simplified for POC)
+        const instructionData = tx.transaction.message.instructions[0]?.data;
+        if (!instructionData) continue;
 
-        // 2. Analyze
-        const report = analyzer.analyze(event.proposal);
+        const bufferData = Buffer.from(instructionData, 'base64');
+        const decoded = decoder.decode(bufferData);
+        
+        // Analyze Metadata (Placeholder metadata for now)
+        const metadata = { title: `TX: ${sig.slice(0, 8)}`, description: 'Instruction data captured from chain.' };
+        const report = analyzer.analyze(metadata);
 
-        // 3. Archive
-        await archiver.archive({ ...event.proposal, analysis: report, action: decoded.action });
+        // Archive & Notify
+        await archiver.archive({ id: sig, analysis: report, action: decoded.action });
 
-        // 4. Notify if High/Critical
         if (['HIGH', 'CRITICAL'].includes(report.impact)) {
             await notifier.sendAlert(report, decoded.action);
         }
     }
-
-    console.log("Sentinel-X: Cycle complete.");
 }
 
-runOracle().catch(err => console.error(err));
+// Run the sequence every 5 minutes (300000ms)
+setInterval(() => {
+    startWatching().catch(err => console.error(err));
+}, 300000);
+
+startWatching().catch(err => console.error(err));
